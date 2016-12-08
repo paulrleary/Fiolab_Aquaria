@@ -2,7 +2,7 @@
 This contains Arduino code, EAGLE schematic files, and other documentation for the Fiolab aquaria control system.
 
 **Description of system:**
-The control system (as of 2016-12-09) consists of 12 Tank Controller units (Arduino Uno + a custom shield) and a Master Arduino (Arduino Mega + Arduino Ethernet Shield + an additional custom shield). Tank Controller units are connected to the Master Arduino on an I2C bus. 
+The control system (as of 2016-12-09) consists of 12 Tank Controller units ([Arduino Uno](https://www.arduino.cc/en/Main/ArduinoBoardUno) + a custom shield) and a Master Arduino ([Arduino Mega](https://www.arduino.cc/en/Main/ArduinoBoardMega2560) + [Arduino Ethernet Shield](https://www.arduino.cc/en/Main/ArduinoEthernetShieldV1) + an additional custom shield). Tank Controller units are connected to the Master Arduino on an I2C bus. 
 
 Each Tank Controller unit is set up to read from 3 analog (0-5V) sensors: temperature, dissolved oxygen (DO), and pH via a 16-bit ADC. These tank conditions are regularly logged to a text file on a micro SD card. The Tank Controller can also read a time-series of set-points for each seawater variable from a text file on the micro SD card. At each time point, the Tank Controller extracts the corresponding temperature, DO, and pH set-points and activates feedback loops for heaters, chillers, and/or solenoid valves to maintain seawater variables at those set points. The Tank Controllers also report current temperature, DO, and pH values, and the status of actuators (heaters, chillers, and solenoid valves) to the Master Arduino when queried.
 
@@ -13,7 +13,7 @@ PCBs for shields were printed by [OSHpark](http://www.oshpark.com).
 
 
 **Folders and files in repository:**
-*TankControllerCode* contains the Arduino code for the Tank Controller units and *TankControllerShield* contains the Eagle schematic files and a parts list for the custom shield. *MasterArduinoCode* contains the Arduino code for the Master Arduino unit and *MasterArduinoShield* contains the Eagle schematic files and a parts list for the custom shield. 
+*TankControllerCode* contains the Arduino code for the Tank Controller units and *TankControllerShield* contains the Eagle schematic files and a electronic parts list for the custom shield. *MasterArduinoCode* contains the Arduino code for the Master Arduino unit and *MasterArduinoShield* contains the Eagle schematic files and an electronic parts list for the custom shield. *GeneralPartsList* is the list of additional parts used in the system.
 
 
 
