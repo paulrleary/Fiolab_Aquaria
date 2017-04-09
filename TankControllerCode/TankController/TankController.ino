@@ -98,6 +98,10 @@ This is a quick overview of what the code does:
       file (LOGxx.TXT), where xx = the tank ID number in the range of 01 - 12.
     - It retrieves the number of lines in the ramp file from the RAMPLEN.TXT file for use in running
       the ramp
+    - It retrieves the current ramp line position from the RAMPPOS.TXT file to determine which line
+      on the ramp to start from. If running a new experiment this value is set to 1. If the Arduino
+      resets in the middle of an experiment (e.g., power loss) this allows the ramp to start from 
+      where it left off. 
     - It retrieves calibration coefficients from the files TCAL.TXT, DOCAL.TXT, and PHCAL.TXT and
       and stores them for use in converting the ADC output to tank variables
     Note: the list of settings text files and the format of the text files can be found in the README
@@ -209,7 +213,7 @@ RTC_DS3234 RTC(RTCPin);
 
 // Define global variables
   // Variable to store the next line position in the ramp file
-  int lineToLoad = 1;
+  int lineToLoad; 
 
   // Variables to store sensor readings
   float currentTemp, currentDO, currentpH;
@@ -220,7 +224,7 @@ RTC_DS3234 RTC(RTCPin);
   // Variables to store real time and logging/ramp intervals
   unsigned long startTime;
   unsigned long logPoint;
-  unsigned long logInterval = 3000;
+  unsigned long logInterval = 3000; // CHANGE THIS TO 5 MINUTES??
   DateTime now;
 
   // Variable to store incoming commands from Master
@@ -277,10 +281,18 @@ void setup() {
 
     // Retrieve length of ramp file
     getRampLength();
-    
+
     #if ECHO_TO_SERIAL
       Serial.print(F("Ramp length = "));Serial.println(rampLength);
     #endif //ECHO_TO_SERIAL
+
+    // Retrieve current ramp position
+    getRampLine(); 
+    
+    #if ECHO_TO_SERIAL
+      Serial.print(F("lineToLoad: "));Serial.println(lineToLoad);
+    #endif //ECHO_TO_SERIAL
+    
   
     // Retrieve sensor calibration values
     loadSensors();
@@ -395,6 +407,9 @@ void loop() {
     } //end of one time point on ramp (one line of the ramp)
 
     lineToLoad++; // update the number for the next ramp line to be read
+
+    updateRampPos(); // write the new lineToLoad value to the SD card
+
     
     
   } // end of ramp while-loop (the last line is reached)
@@ -447,6 +462,7 @@ void loop() {
 //
 //    getTankID 
 //    getRampLength
+//    getRampPos
 //    loadSensors
 //      getSensorCoef
 //    receiveEvent
@@ -463,6 +479,7 @@ void loop() {
 //    updateActuators
 //    DOSolPulse
 //    CO2SolPulse
+//    updateRampPos
 
 
 
@@ -535,6 +552,32 @@ void getRampLength() {
   }
   myFile.close(); 
 } // end function getRampLength
+
+
+// Function to retrieve the current line position in the ramp from the 'RAMPPOS.TXT' file
+// and store it in the variable lineToLoad. When starting a new experiment, lineToLoad
+// is set to 1.
+void getRampPos() {
+  char readChar;
+  char tempVal [4];
+   
+  if (!myFile.open("RAMPPOS.TXT", O_READ)) sd.errorHalt("Failed to load ramp length");
+  while (myFile.available()) { 
+    readChar = myFile.read();
+    for (int i = 0; i < 4; i++) {
+      if (readChar != ';') {
+        tempVal[i] = readChar;
+        readChar = myFile.read();
+      } else {
+      tempVal[i] = '\0';
+      break;
+      }
+    }
+    lineToLoad = atoi(tempVal); // store ramp length as int
+  }
+  myFile.close(); 
+
+} // end function getRampPos
 
 
 
@@ -1000,3 +1043,21 @@ void CO2SolPulse() {
   }
   digitalWrite(solCO2Pin, LOW);
 } // end function CO2SolPulse
+
+// Function to write the current lineToLoad value to the SD card
+// This allows the value to be retrieved and the ramp to continue
+// where it left off, if the Arduino loses power and resets
+void updateRampPos() {
+  
+  // open RAMPPOS.TXT and clear current value before writing
+  if (myFile.open("RAMPPOS.TXT", O_RDWR | O_CREAT | O_TRUNC)) {
+    digitalWrite(sdLEDPin, LOW); // turn off SD error LED
+    myFile.print(lineToLoad,DEC);myFile.println(";");
+    myFile.close();
+  } else {
+    Serial.println("Failed to open or create log file");
+    digitalWrite(sdLEDPin, HIGH); // turn on SD error LED
+  }
+
+}
+
