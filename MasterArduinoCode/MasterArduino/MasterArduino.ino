@@ -181,9 +181,13 @@ float cyCoefs[2] = {-1253.355, 4.52456}; // intercept and slope for pressure cal
 
   // For logging time invervals
   unsigned long logPoint;
-  int logInterval = 30000; // intervals for logging data to SD or cloud datastream
+  int logInterval = 300000; // intervals for logging data to SD or cloud datastream
                            // should be > 9000 to work with Phant server
-                           
+
+  // For printing to the serial monitor
+  unsigned long serialPoint;
+  int serialInterval = 10000;
+                       
 
 // possible commands to give Slave Arduinos, coded as bytes
 enum {
@@ -313,6 +317,7 @@ void setup () {
   logPoint = millis();
   cyPoint = millis();
   lcdPoint = millis();
+  serialPoint = millis();
   #if ECHO_TO_SERIAL
     Serial.println(F("LogPoints initialised"));
   #endif //ECHO_TO_SERIAL
@@ -360,12 +365,24 @@ void loop(){
     // Stream all tank data to cloud
     DataToCloud();
 
-    // Send all tank data to serial port
-    DataToSerial();
-    
-
+    // update logPoint
     logPoint = millis();
   }
+
+
+  #if ECHO_TO_SERIAL
+    // If next serial-report timepoint has been reached, log and report data
+    if (millis() - serialPoint > serialInterval) {
+      
+      // Send all tank data to serial port
+      DataToSerial();
+  
+      // update timepoint
+      serialPoint = millis();
+    }
+  #endif //ECHO_TO_SERIAL
+
+    
 
   // If next cylinder-check timepoint has been reached, send data to 
   // cloud and initialise indicator lights and twitter alert if necessary
@@ -892,7 +909,9 @@ void streamTank(byte tankNo){
   while (client.connected()) {
     if (client.available()) {
       char c = client.read();
-      //Serial.print(c);
+      #if ECHO_TO_SERIAL
+        Serial.print(c);
+       #endif //ECHO_TO_SERIAL
     }      
   }
   Serial.println();
