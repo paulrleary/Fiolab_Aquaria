@@ -287,7 +287,7 @@ void setup() {
     #endif //ECHO_TO_SERIAL
 
     // Retrieve current ramp position
-    getRampLine(); 
+    getRampPos(); 
     
     #if ECHO_TO_SERIAL
       Serial.print(F("lineToLoad: "));Serial.println(lineToLoad);
@@ -373,6 +373,10 @@ void loop() {
 
     // Get values from the next line from the ramp file
     getRampLine(); 
+    #if ECHO_TO_SERIAL
+      Serial.print("Ramp timepoint: ");Serial.println(timeMinutes);
+    #endif
+    
     
     // Loop to run while the next time-point in the ramp has not been reached
     // This reads sensors and regulates variables against the setpoints in the current ramp line
@@ -407,6 +411,7 @@ void loop() {
     } //end of one time point on ramp (one line of the ramp)
 
     lineToLoad++; // update the number for the next ramp line to be read
+    Serial.print(F("LTL update: "));Serial.println(lineToLoad);
 
     updateRampPos(); // write the new lineToLoad value to the SD card
 
@@ -560,20 +565,25 @@ void getRampLength() {
 void getRampPos() {
   char readChar;
   char tempVal [4];
+
    
-  if (!myFile.open("RAMPPOS.TXT", O_READ)) sd.errorHalt("Failed to load ramp length");
+  if (!myFile.open("RAMPPOS.TXT", O_READ)) sd.errorHalt("Failed to load ramp position");
+  Serial.print(F("readChar = "));
   while (myFile.available()) { 
     readChar = myFile.read();
     for (int i = 0; i < 4; i++) {
-      if (readChar != ';') {
+      if (readChar != '\0') {
         tempVal[i] = readChar;
+        Serial.print(readChar);
         readChar = myFile.read();
       } else {
       tempVal[i] = '\0';
       break;
       }
     }
-    lineToLoad = atoi(tempVal); // store ramp length as int
+    Serial.println("");
+    Serial.print(F("tempVal = "));Serial.println(tempVal);
+    lineToLoad = atoi(tempVal); // store ramp position as int
   }
   myFile.close(); 
 
@@ -635,9 +645,9 @@ void getSensorCoef(byte sensor) {
     }
     slope = atof(tempVal);
     
-  if (sensor == 0) {
+  if (sensor == 0) {  // thermistor has an extra parameter for the fixed resistor
       readChar = myFile.read();
-      for (byte i = 0; i < 10; i++) {
+      for (byte i = 0; i < 6; i++) {
         if (readChar !=';') {
           tempVal[i] = readChar;
           readChar = myFile.read();
@@ -653,8 +663,8 @@ void getSensorCoef(byte sensor) {
 
   switch (sensor) {
     case 0:
-      tSens [0] = intercept; // this is really Ro
-      tSens [1] = slope; // this is B
+      tSens [0] = intercept; 
+      tSens [1] = slope; 
       tSens [2] = resistor;
       break;
     case 1:
@@ -916,6 +926,7 @@ void getRampLine(){
         lineNumber++; // update the line number
         lineIndex++; 
         if (lineNumber == lineToLoad){  //if this is the correct line to load
+          Serial.print(F("Line loaded: "));Serial.println(lineNumber);
           lineNumber = 0;
           lineIndex = 0;
           break; // break out of the "while" loop to process data
@@ -946,7 +957,7 @@ void getRampLine(){
     pHMin = tempvals [6];   
   } else {
     digitalWrite(sdLEDPin, HIGH);
-    Serial.println("Failed to open ramp file"); 
+    Serial.println(F("Failed to open ramp file")); 
   } 
 } // end function getRampLine
 
@@ -1047,17 +1058,18 @@ void CO2SolPulse() {
 // Function to write the current lineToLoad value to the SD card
 // This allows the value to be retrieved and the ramp to continue
 // where it left off, if the Arduino loses power and resets
-void updateRampPos() {
-  
+void updateRampPos() { 
+  char buffer [4];
   // open RAMPPOS.TXT and clear current value before writing
-  if (myFile.open("RAMPPOS.TXT", O_RDWR | O_CREAT | O_TRUNC)) {
+  if (myFile.open("RAMPPOS.TXT", O_RDWR | O_TRUNC)) {
     digitalWrite(sdLEDPin, LOW); // turn off SD error LED
-    myFile.print(lineToLoad,DEC);myFile.println(";");
+    
+    myFile.print(lineToLoad);myFile.print('\0');
+    
     myFile.close();
   } else {
-    Serial.println("Failed to open or create log file");
+    Serial.println(F("Failed to open or create RAMPPOS file"));
     digitalWrite(sdLEDPin, HIGH); // turn on SD error LED
   }
-
 }
 
