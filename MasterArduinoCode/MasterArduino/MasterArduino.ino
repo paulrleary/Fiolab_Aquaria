@@ -181,12 +181,12 @@ float cyCoefs[2] = {-1253.355, 4.52456}; // intercept and slope for pressure cal
 
   // For logging time invervals
   unsigned long logPoint;
-  int logInterval = 30000; // intervals for logging data to SD or cloud datastream
-                           // should be > 9000 to work with Phant server
+  int logInterval = 300000; // log data every 5 minutes
+                           // this interval should be > 9000 to work with Phant server
 
   // For printing to the serial monitor
   unsigned long serialPoint;
-  int serialInterval = 10000;
+  int serialInterval = 10000; // reports to serial every 10 seconds
                        
 
 // possible commands to give Slave Arduinos, coded as bytes
