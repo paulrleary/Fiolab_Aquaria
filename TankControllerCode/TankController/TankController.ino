@@ -1,9 +1,9 @@
 /*
 FIOLAB TANK CONTROLLER ARDUINO AND SHIELD
 
-v2
+v2.1
 
-2016-12-07
+2017-06-29
 
 Natalie Low and Crystal Ng
 
@@ -22,7 +22,7 @@ the tank controller shield will be available on Github (https://github.com/lowhn
 and parts for the master Arduino will able be available.
 
 v2: replaced the 12-bit ADC with the 16-bit ADS1118 and added working code for pH control 
-
+v2.1: added code for the Arduino to track the current ramp line and remember it upon resetting (i.e. power outages)
 
 //////////////////////////////////////////////////////////////////////////////////////
 ABOUT THE TANK CONTROLLER SHIELD:
@@ -98,6 +98,10 @@ This is a quick overview of what the code does:
       file (LOGxx.TXT), where xx = the tank ID number in the range of 01 - 12.
     - It retrieves the number of lines in the ramp file from the RAMPLEN.TXT file for use in running
       the ramp
+    - It retrieves the current ramp line position from the RAMPPOS.TXT file to determine which line
+      on the ramp to start from. If running a new experiment this value is set to 1. If the Arduino
+      resets in the middle of an experiment (e.g., power loss) this allows the ramp to start from 
+      where it left off. 
     - It retrieves calibration coefficients from the files TCAL.TXT, DOCAL.TXT, and PHCAL.TXT and
       and stores them for use in converting the ADC output to tank variables
     Note: the list of settings text files and the format of the text files can be found in the README
@@ -114,6 +118,7 @@ This is a quick overview of what the code does:
        - Reads and parses comma-separated values from a RAMPxx.TXT on the SD card, which contains the
         timepoints and tank variable setpoints. The setpoints consist of a minimum and maximum
         allowed value for each tank variable. 
+          - It starts reading from the ramp line as specified in RAMPPOS.TXT
           - The structure of RAMPxx.TXT: [timePoint],[tempMax],[tempMin],[DOMax],[DOMin],[pHMax],[pHMin]
           - just set a crazy extreme value for any parameters that are not going to be regulated
       - Reads current time from the DS3234 RTC
@@ -123,6 +128,7 @@ This is a quick overview of what the code does:
         appropriate.
       - When the timepoint on ramp line is reached, reads and parses comma-separated values from 
         the next line of the RAMPXX.TXT file
+          - Also records the new ramp line to RAMPPOS.TXT
       - Logs timestamped sensor values and actuator statuses to the SD card
           - Structure of LOGxx.TXT: [timeStamp],[Temp],[DO],[pH],[Heater],[Chiller],[SolN2],[SolCO2],[SolAir],[counter]
       - Sends sensor values and actuator statuses to the Master Arduino via I2C when requrested 
@@ -209,7 +215,7 @@ RTC_DS3234 RTC(RTCPin);
 
 // Define global variables
   // Variable to store the next line position in the ramp file
-  int lineToLoad = 1;
+  int lineToLoad; 
 
   // Variables to store sensor readings
   float currentTemp, currentDO, currentpH;
@@ -219,8 +225,10 @@ RTC_DS3234 RTC(RTCPin);
   
   // Variables to store real time and logging/ramp intervals
   unsigned long startTime;
+  unsigned long serialPoint;
   unsigned long logPoint;
-  unsigned long logInterval = 3000;
+  unsigned long logInterval = 300000; // Logs to SD card every 5 min
+  int serialInterval = 10000; // reports to serial every 10 sec 
   DateTime now;
 
   // Variable to store incoming commands from Master
@@ -277,17 +285,24 @@ void setup() {
 
     // Retrieve length of ramp file
     getRampLength();
-    
+
     #if ECHO_TO_SERIAL
       Serial.print(F("Ramp length = "));Serial.println(rampLength);
     #endif //ECHO_TO_SERIAL
-  
+
+    // Retrieve current ramp position
+    getRampPos(); 
+    
+    #if ECHO_TO_SERIAL
+      Serial.print(F("lineToLoad: "));Serial.println(lineToLoad);
+    #endif //ECHO_TO_SERIAL
+      
     // Retrieve sensor calibration values
     loadSensors();
     
     #if ECHO_TO_SERIAL
-      Serial.print(F("Thermistor R0: "));Serial.print(tSens[0]);Serial.print(F(" B: "));Serial.print(tSens[1]);
-      Serial.print(F(" Res: "));Serial.println(tSens[2]);
+      Serial.print(F("Thermistor intercept: "));Serial.print(tSens[0]);Serial.print(F(", slope: "));Serial.print(tSens[1]);
+      Serial.print(F(" FixedRes: "));Serial.println(tSens[2]);
       Serial.print(F("DO intercept: "));Serial.print(doSens[0]);Serial.print(F(", DO slope: "));Serial.println(doSens[1]);
       Serial.print(F("pH intercept: "));Serial.print(phSens[0]);Serial.print(F(", pH slope: "));Serial.println(phSens[1]);
     #endif /ECHO_TO_SERIAL
@@ -322,19 +337,26 @@ void setup() {
     // Read sensor values from ADC
     readSensors(); 
 
-    // If next logging timepoint has been reached, log and report data
+    // If next logging timepoint has been reached, log data to SD card
     if (millis() - logPoint > logInterval) {
 
         // Log tank data to SD card
         LogToSD();
-
-        #if ECHO_TO_SERIAL
-          // Report data to serial monitor
-          serialReport();
-        #endif
-
+        
+        // Update logPoint
         logPoint = millis();
       }
+
+    // If next serial report timepoint has been reached, report data to serial monitor
+    if (millis() - serialPoint > serialInterval) {
+
+        // Report tank data to serial monitor
+        serialReport();
+        
+        // Update logPoint
+        serialPoint = millis();
+      }
+
 
       delay(500);  // I2C communication with Master fails w/o adding a short delay here
                   // increase the delay time if having I2C issues 
@@ -361,6 +383,10 @@ void loop() {
 
     // Get values from the next line from the ramp file
     getRampLine(); 
+    #if ECHO_TO_SERIAL
+      Serial.print(F("Ramp timepoint: "));Serial.println(timeMinutes);
+    #endif
+    
     
     // Loop to run while the next time-point in the ramp has not been reached
     // This reads sensors and regulates variables against the setpoints in the current ramp line
@@ -376,28 +402,43 @@ void loop() {
       updateActuators(); 
       DOSolPulse();
       CO2SolPulse();
-      
-      // If next logging timepoint has been reached, log and report data
-      if (millis() - logPoint > logInterval) {
-        
-        LogToSD();// Log current tank conditions to SD card
-     
-         #if ECHO_TO_SERIAL
-          // Report data to serial monitor
-          serialReport();
-        #endif
 
-        logPoint = millis(); // update the time of the last logging event
+      // If next logging timepoint has been reached, log data to SD card
+      if (millis() - logPoint > logInterval) {
+
+        // Log tank data to SD card
+        LogToSD();
+        
+        // Update logPoint
+        logPoint = millis();
       }
 
-      delay(500); // delay to allow 
+      // If next serial report timepoint has been reached, report data to serial monitor
+      if (millis() - serialPoint > serialInterval) {
+
+        // Report tank data to serial monitor
+        serialReport();
+        
+        // Update logPoint
+        serialPoint = millis();
+      }
+
+      delay(500); // delay to allow I2C communication with Master
 
     } //end of one time point on ramp (one line of the ramp)
 
     lineToLoad++; // update the number for the next ramp line to be read
+    Serial.print(F("LTL update: "));Serial.println(lineToLoad);
+
+    updateRampPos(); // write the new lineToLoad value to the SD card
     
     
   } // end of ramp while-loop (the last line is reached)
+
+  // ----- RAMP ENDS -----
+  Serial.println(F("Ramp end."));
+
+  
   
   // Turn off green ramp indicator LED; ramp is complete
   digitalWrite(rampLEDPin, LOW); 
@@ -419,16 +460,26 @@ void loop() {
   // Read sensor values from ADC
   readSensors(); 
 
-  // If next logging timepoint has been reached, log and report data
+  // If next logging timepoint has been reached, log data to SD card
   if (millis() - logPoint > logInterval) {
     
-      LogToSD();
+    // Log tank data to SD card
+    LogToSD();
+        
+    // Update logPoint
+    logPoint = millis();
     
-       #if ECHO_TO_SERIAL
-          serialReport();
-       #endif
+  }
 
-      logPoint = millis();
+  // If next serial report timepoint has been reached, report data to serial monitor
+  if (millis() - serialPoint > serialInterval) {
+    
+    // Report tank data to serial monitor
+    serialReport();
+        
+    // Update logPoint
+    serialPoint = millis();
+    
     }
 
     delay(500); 
@@ -447,6 +498,7 @@ void loop() {
 //
 //    getTankID 
 //    getRampLength
+//    getRampPos
 //    loadSensors
 //      getSensorCoef
 //    receiveEvent
@@ -463,6 +515,7 @@ void loop() {
 //    updateActuators
 //    DOSolPulse
 //    CO2SolPulse
+//    updateRampPos
 
 
 
@@ -494,7 +547,6 @@ void getTankID()  {
     strcpy(logFile,"LOG");
 
     if (myAddress < 10){
-      //Serial.println(rampFile);
       rampFile[4] = '0';
       rampFile [5] = tempAddress [0];
       logFile[3] = '0';
@@ -537,6 +589,35 @@ void getRampLength() {
 } // end function getRampLength
 
 
+// Function to retrieve the current line position in the ramp from the 'RAMPPOS.TXT' file
+// and store it in the variable lineToLoad. When starting a new experiment, lineToLoad
+// is set to 1.
+void getRampPos() {
+  char readChar;
+  char tempVal [4];
+
+   
+  if (!myFile.open("RAMPPOS.TXT", O_READ)) sd.errorHalt("Failed to load ramp position");
+  while (myFile.available()) { 
+    readChar = myFile.read();
+    for (int i = 0; i < 5; i++) {
+        if (readChar != ';') {
+        tempVal[i] = readChar;
+        readChar = myFile.read();
+      } else {
+      tempVal[i] = ';';
+//      tempVal[i] = '\0';
+      break;
+      }
+    }
+//    Serial.print(F("tempVal = "));Serial.println(tempVal);
+    lineToLoad = atoi(tempVal); // store ramp position as int
+  }
+  myFile.close(); 
+
+} // end function getRampPos
+
+
 
 // Function to retrieve calibration coefficients for all sensors. Calls getSensorCoef() function.
 void loadSensors() {
@@ -569,7 +650,7 @@ void getSensorCoef(byte sensor) {
 
   while (myFile.available()) {
     readChar = myFile.read();
-    for (byte i = 0; i < 13; i++) {             // intercept to more decimal places now with 16bit ADC
+    for (byte i = 0; i < 13; i++) { // first param is the regression intercept
       if (readChar !=',') {
         tempVal[i] = readChar;
         readChar = myFile.read();
@@ -581,7 +662,7 @@ void getSensorCoef(byte sensor) {
     intercept = atof(tempVal);
 
     readChar = myFile.read();
-    for (byte i = 0; i < 13; i++) {                  // ph slope needs to be to several decimal places!!
+    for (byte i = 0; i < 13; i++) {   // second param is the regression slope
       if ((readChar !=';') & (readChar !=',')) {
         tempVal[i] = readChar;
         readChar = myFile.read();
@@ -592,9 +673,9 @@ void getSensorCoef(byte sensor) {
     }
     slope = atof(tempVal);
     
-  if (sensor == 0) {
+  if (sensor == 0) {  // thermistor has an extra parameter for the fixed resistor
       readChar = myFile.read();
-      for (byte i = 0; i < 10; i++) {
+      for (byte i = 0; i < 6; i++) {
         if (readChar !=';') {
           tempVal[i] = readChar;
           readChar = myFile.read();
@@ -610,8 +691,8 @@ void getSensorCoef(byte sensor) {
 
   switch (sensor) {
     case 0:
-      tSens [0] = intercept; // this is really Ro
-      tSens [1] = slope; // this is B
+      tSens [0] = intercept; 
+      tSens [1] = slope; 
       tSens [2] = resistor;
       break;
     case 1:
@@ -744,8 +825,10 @@ void readSensors() {
   int avgDO = DOSum/n;
 
 //  Conversion via regression coefs here
-  float resTemp = (tSens[2]*1000)*((4095/(float)avgTemp)-1);
-  currentTemp = 1/(log(resTemp/tSens[0])/tSens[1] + 1/298.15) - 273.15;
+//  float resTemp = (tSens[2]*1000)*((4095/(float)avgTemp)-1);
+//  currentTemp = 1/(log(resTemp/tSens[0])/tSens[1] + 1/298.15) - 273.15;
+  float resTemp = (0.000125*tSens[2]*(float)avgTemp)/(5-(0.000125*(float)avgTemp));
+  currentTemp = (1/(tSens[0]+(tSens[1]*log(resTemp))))-273.15;
   currentDO = doSens[0] + avgDO*doSens[1];
   currentpH = phSens[0] + avgpH*phSens[1];
     
@@ -858,7 +941,7 @@ void serialReport(){
 void getRampLine(){
   int lineIndex = 0;
   int lineNumber = 0;
-  char rampLine [36]; 
+  char rampLine [40]; 
   char readChar;
   
   if (myFile.open(rampFile, O_READ)) {
@@ -873,6 +956,7 @@ void getRampLine(){
         lineNumber++; // update the line number
         lineIndex++; 
         if (lineNumber == lineToLoad){  //if this is the correct line to load
+          Serial.print(F("Line loaded: "));Serial.println(lineNumber);
           lineNumber = 0;
           lineIndex = 0;
           break; // break out of the "while" loop to process data
@@ -903,7 +987,7 @@ void getRampLine(){
     pHMin = tempvals [6];   
   } else {
     digitalWrite(sdLEDPin, HIGH);
-    Serial.println("Failed to open ramp file"); 
+    Serial.println(F("Failed to open ramp file")); 
   } 
 } // end function getRampLine
 
@@ -1000,3 +1084,20 @@ void CO2SolPulse() {
   }
   digitalWrite(solCO2Pin, LOW);
 } // end function CO2SolPulse
+
+// Function to write the current lineToLoad value to the SD card
+// This allows the value to be retrieved and the ramp to continue
+// where it left off, if the Arduino loses power and resets
+void updateRampPos() { 
+  char buffer [4];
+  // open RAMPPOS.TXT and clear current value before writing
+  if (myFile.open("RAMPPOS.TXT", O_RDWR | O_TRUNC)) {
+    digitalWrite(sdLEDPin, LOW); // turn off SD error LED
+    myFile.print(lineToLoad);myFile.print(';');
+    myFile.close();
+  } else {
+    Serial.println(F("Failed to open or create RAMPPOS file"));
+    digitalWrite(sdLEDPin, HIGH); // turn on SD error LED
+  }
+}
+
