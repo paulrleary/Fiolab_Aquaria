@@ -1,9 +1,9 @@
 /*
 FIOLAB TANK CONTROLLER ARDUINO AND SHIELD
 
-v2
+v2.1
 
-2016-12-07
+2017-06-29
 
 Natalie Low and Crystal Ng
 
@@ -22,7 +22,7 @@ the tank controller shield will be available on Github (https://github.com/lowhn
 and parts for the master Arduino will able be available.
 
 v2: replaced the 12-bit ADC with the 16-bit ADS1118 and added working code for pH control 
-
+v2.1: added code for the Arduino to track the current ramp line and remember it upon resetting (i.e. power outages)
 
 //////////////////////////////////////////////////////////////////////////////////////
 ABOUT THE TANK CONTROLLER SHIELD:
@@ -118,6 +118,7 @@ This is a quick overview of what the code does:
        - Reads and parses comma-separated values from a RAMPxx.TXT on the SD card, which contains the
         timepoints and tank variable setpoints. The setpoints consist of a minimum and maximum
         allowed value for each tank variable. 
+          - It starts reading from the ramp line as specified in RAMPPOS.TXT
           - The structure of RAMPxx.TXT: [timePoint],[tempMax],[tempMin],[DOMax],[DOMin],[pHMax],[pHMin]
           - just set a crazy extreme value for any parameters that are not going to be regulated
       - Reads current time from the DS3234 RTC
@@ -127,6 +128,7 @@ This is a quick overview of what the code does:
         appropriate.
       - When the timepoint on ramp line is reached, reads and parses comma-separated values from 
         the next line of the RAMPXX.TXT file
+          - Also records the new ramp line to RAMPPOS.TXT
       - Logs timestamped sensor values and actuator statuses to the SD card
           - Structure of LOGxx.TXT: [timeStamp],[Temp],[DO],[pH],[Heater],[Chiller],[SolN2],[SolCO2],[SolAir],[counter]
       - Sends sensor values and actuator statuses to the Master Arduino via I2C when requrested 
@@ -294,8 +296,7 @@ void setup() {
     #if ECHO_TO_SERIAL
       Serial.print(F("lineToLoad: "));Serial.println(lineToLoad);
     #endif //ECHO_TO_SERIAL
-    
-  
+      
     // Retrieve sensor calibration values
     loadSensors();
     
