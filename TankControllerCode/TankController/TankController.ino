@@ -143,8 +143,8 @@ This is a quick overview of what the code does:
 #include <Wire.h>
 #include <SdFat.h>
 #include <SPI.h> 
-#include <RTClib.h>
-#include <RTC_DS3234.h>
+//#include <RTClib.h>
+#include <RTC_DS3234.h> //PRL:Working for now, but need to come back to this one.  I don't like that we would have to rely on an external library, but having lots of trouble when using this one locally.
 
 #define ECHO_TO_SERIAL 1     // echo data to serial port
 
