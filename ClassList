@@ -1,0 +1,28 @@
+Objects:
+
+ADS1118Sensor:
+TemperatureSensor
+GasSensor
+
+same class:
+Heater 
+Chiller
+CO2
+N2
+
+Take N2:
+properties:
+CurrentReading
+Setpoint (range between DOMax and DOMin)
+UpdateTime
+Pin
+
+RampReader
+RTCReader
+
+
+CONTROLLER:
+has sensor and actuator?
+
+
+
