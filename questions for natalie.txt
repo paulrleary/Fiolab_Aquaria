@@ -1,0 +1,9 @@
+questions for natalie:
+WHat is SPI_MODE[0:3] for?
+	- some of the instances let me comment out, mostly same performance but occasional large negative values?
+
+
+notes:
+currently no averaging.
+
+break up constructor inputs into config functions?

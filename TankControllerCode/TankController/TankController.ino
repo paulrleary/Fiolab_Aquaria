@@ -240,6 +240,16 @@ RTC_DS3234 RTC(RTCPin);
 
 
 //////////////////////////////////////////////
+/*
+ * PRL Additions Here.  Some may be redundant with above
+ */
+
+ #include "Sensor.h"
+
+ Sensor DOsensor
+ Sensor PHsensor
+ Sensor Tempsensor
+//////////////////////////////////////////////
 
 void setup() {
      
@@ -298,7 +308,7 @@ void setup() {
     #endif //ECHO_TO_SERIAL
       
     // Retrieve sensor calibration values
-    loadSensors();
+    loadSensors(); // SENSOR
     
     #if ECHO_TO_SERIAL
       Serial.print(F("Thermistor intercept: "));Serial.print(tSens[0]);Serial.print(F(", slope: "));Serial.print(tSens[1]);
@@ -335,7 +345,7 @@ void setup() {
     getTime(); 
 
     // Read sensor values from ADC
-    readSensors(); 
+    readSensors(); // SENSOR
 
     // If next logging timepoint has been reached, log data to SD card
     if (millis() - logPoint > logInterval) {
