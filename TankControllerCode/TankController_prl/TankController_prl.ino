@@ -148,6 +148,9 @@ This is a quick overview of what the code does:
 
 #define ECHO_TO_SERIAL 1     // echo data to serial port
 
+#include "GasSensor.h"
+#include "TemperatureSensor.h"
+
 // Tank-specific and sensor-specific variables
 // These will be defined by the settings file on the SD card
 byte myAddress; // I2C address of this Arduino
@@ -246,9 +249,9 @@ RTC_DS3234 RTC(RTCPin);
 
  // #include "Sensor.h"
 
- // Sensor DOsensor
- // Sensor PHsensor
- // Sensor Tempsensor
+ GasSensor DOsensor(adcCSPin, 2);
+ GasSensor PHsensor(adcCSPin, 1);
+ TemperatureSensor Tempsensor(adcCSPin, 2);
 //////////////////////////////////////////////
 
 void setup() {
@@ -269,9 +272,9 @@ void setup() {
     pinMode(rampLEDPin, OUTPUT);
     pinMode(sdLEDPin, OUTPUT);
     
-    // Pins for SPI devices
-    pinMode (adcCSPin, OUTPUT);
-    digitalWrite(adcCSPin, HIGH); 
+    // // Pins for SPI devices
+    // pinMode (adcCSPin, OUTPUT);
+    // digitalWrite(adcCSPin, HIGH); 
     
   // Initialize serial communications for testing and debugging code
     Serial.begin(9600);
@@ -309,6 +312,11 @@ void setup() {
       
     // Retrieve sensor calibration values
     loadSensors(); // SENSOR
+
+    //PRL
+    DOsensor.initializeCalibration(doSens [1], doSens [0]);
+    PHsensor.initializeCalibration(phSens [1], phSens [0]);
+    Tempsensor.initializeCalibration(tSens [1], tSens [0], tSens[2]);
     
     #if ECHO_TO_SERIAL
       Serial.print(F("Thermistor intercept: "));Serial.print(tSens[0]);Serial.print(F(", slope: "));Serial.print(tSens[1]);
@@ -317,11 +325,12 @@ void setup() {
       Serial.print(F("pH intercept: "));Serial.print(phSens[0]);Serial.print(F(", pH slope: "));Serial.println(phSens[1]);
     #endif /ECHO_TO_SERIAL
    
-  // Begin standard SPI for SD card and ADC
-  SPI.begin();
-  SPI.setBitOrder(MSBFIRST); 
-  SPI.setDataMode(SPI_MODE0); 
-  SPI.setClockDivider(SPI_CLOCK_DIV16); 
+   //PRL
+  // // Begin standard SPI for SD card and ADC
+  // SPI.begin();
+  // SPI.setBitOrder(MSBFIRST); 
+  // SPI.setDataMode(SPI_MODE0); 
+  // SPI.setClockDivider(SPI_CLOCK_DIV16); 
     
   // Begin I2C communication with Master Arduino
   Wire.begin (myAddress); // begin I2C
@@ -345,7 +354,7 @@ void setup() {
     getTime(); 
 
     // Read sensor values from ADC
-    readSensors(); // SENSOR
+    readSensors(); // PRL Updated
 
     // If next logging timepoint has been reached, log data to SD card
     if (millis() - logPoint > logInterval) {
@@ -808,70 +817,74 @@ void getTime() {
 // the readings, and convert the averaged digital value into temp/DO/pH values using
 // the sensor regression coefficients. Calls the readADC() function
 void readSensors() {
-  long pHSum = 0;
-  long tempSum = 0;
-  long DOSum = 0;
-  int adcpH, adcTemp, adcDO;
-  byte n = 0;
-  SPI.setDataMode(SPI_MODE1);
-  for (byte i = 0; i < 20; i++) {
-    adcpH = readADC(0);
-    delay(10);
-    adcpH = readADC(0);
-    adcTemp = readADC(1);
-    delay(10);
-    adcTemp = readADC(1);
-    adcDO = readADC(2);
-    delay(10);
-    adcDO = readADC(2);
+  //PRL, funcionality now built into class
+  currentTemp = Tempsensor.readCalibrated();
+  currentDO = DOsensor.readCalibrated();
+  currentpH = PHsensor.readCalibrated();
+//   long pHSum = 0;
+//   long tempSum = 0;
+//   long DOSum = 0;
+//   int adcpH, adcTemp, adcDO;
+//   byte n = 0;
+//   SPI.setDataMode(SPI_MODE1);
+//   for (byte i = 0; i < 20; i++) {
+//     adcpH = readADC(0);
+//     delay(10);
+//     adcpH = readADC(0);
+//     adcTemp = readADC(1);
+//     delay(10);
+//     adcTemp = readADC(1);
+//     adcDO = readADC(2);
+//     delay(10);
+//     adcDO = readADC(2);
 
-    pHSum = pHSum + adcpH;
-    tempSum = tempSum + adcTemp;
-    DOSum = DOSum + adcDO;
-    n++;
-  }
-  int avgpH = pHSum/n;
-  int avgTemp = tempSum/n;
-  int avgDO = DOSum/n;
+//     pHSum = pHSum + adcpH;
+//     tempSum = tempSum + adcTemp;
+//     DOSum = DOSum + adcDO;
+//     n++;
+//   }
+//   int avgpH = pHSum/n;
+//   int avgTemp = tempSum/n;
+//   int avgDO = DOSum/n;
 
-//  Conversion via regression coefs here
-//  float resTemp = (tSens[2]*1000)*((4095/(float)avgTemp)-1);
-//  currentTemp = 1/(log(resTemp/tSens[0])/tSens[1] + 1/298.15) - 273.15;
-  float resTemp = (0.000125*tSens[2]*(float)avgTemp)/(5-(0.000125*(float)avgTemp));
-  currentTemp = (1/(tSens[0]+(tSens[1]*log(resTemp))))-273.15;
-  currentDO = doSens[0] + avgDO*doSens[1];
-  currentpH = phSens[0] + avgpH*phSens[1];
+// //  Conversion via regression coefs here
+// //  float resTemp = (tSens[2]*1000)*((4095/(float)avgTemp)-1);
+// //  currentTemp = 1/(log(resTemp/tSens[0])/tSens[1] + 1/298.15) - 273.15;
+//   float resTemp = (0.000125*tSens[2]*(float)avgTemp)/(5-(0.000125*(float)avgTemp));
+//   currentTemp = (1/(tSens[0]+(tSens[1]*log(resTemp))))-273.15;
+//   currentDO = doSens[0] + avgDO*doSens[1];
+//   currentpH = phSens[0] + avgpH*phSens[1];
     
-  SPI.setDataMode(SPI_MODE0);
+//   SPI.setDataMode(SPI_MODE0);
 }
 
 
+//PRL functionality now built into class
+// // Reads the ADS 1118 ADC
+// int readADC(byte channel) {
+//   int rawVal = 0; // Raw value received back from the ADS1118
+//   byte MSB, LSB, MSBConf, LSBConf; //The most and least significant bits read from the ADS1118
+//   switch(channel) { // Most Significant Bit configuration register - this specifies which channel to read from
+//     case 0: MSBConf = 0b11000010;
+//     break;
+//     case 1: MSBConf = 0b11010010;
+//     break;
+//     case 2: MSBConf = 0b11100010;
+//     break;
+//   } 
+//   LSBConf=0b10101011; // Least Significant Bit configuration register
+//   noInterrupts();
+//   digitalWrite(adcCSPin, LOW);
+//   MSB = SPI.transfer(MSBConf);
+//   LSB = SPI.transfer(LSBConf);
+//   digitalWrite(adcCSPin, HIGH);
+//   interrupts();
+// //  delay(10);   //delay of 7 or less leads to erratic readings from each channel
 
-// Reads the ADS 1118 ADC
-int readADC(byte channel) {
-  int rawVal = 0; // Raw value received back from the ADS1118
-  byte MSB, LSB, MSBConf, LSBConf; //The most and least significant bits read from the ADS1118
-  switch(channel) { // Most Significant Bit configuration register - this specifies which channel to read from
-    case 0: MSBConf = 0b11000010;
-    break;
-    case 1: MSBConf = 0b11010010;
-    break;
-    case 2: MSBConf = 0b11100010;
-    break;
-  } 
-  LSBConf=0b10101011; // Least Significant Bit configuration register
-  noInterrupts();
-  digitalWrite(adcCSPin, LOW);
-  MSB = SPI.transfer(MSBConf);
-  LSB = SPI.transfer(LSBConf);
-  digitalWrite(adcCSPin, HIGH);
-  interrupts();
-//  delay(10);   //delay of 7 or less leads to erratic readings from each channel
-
-  // Build the raw value from the most and least significant bits
-  rawVal = (MSB << 8) | LSB;
-  return rawVal;
-} // end function readADC
+//   // Build the raw value from the most and least significant bits
+//   rawVal = (MSB << 8) | LSB;
+//   return rawVal;
+// } // end function readADC
  
 
 

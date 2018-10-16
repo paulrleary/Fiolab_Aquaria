@@ -6,7 +6,7 @@ Class2 c1;
 void setup() {
   Serial.begin(9600);
 
-//  c1.x = 3;
+  c1.x = 3;
 //  c1.y = 17;
 //  c1.z = 55;
   //  c1.m = 59;
