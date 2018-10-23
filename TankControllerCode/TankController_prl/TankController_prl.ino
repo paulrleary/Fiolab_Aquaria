@@ -150,6 +150,7 @@ This is a quick overview of what the code does:
 
 #include "GasSensor.h"
 #include "TemperatureSensor.h"
+#include "Actuator.h"
 
 // Tank-specific and sensor-specific variables
 // These will be defined by the settings file on the SD card
@@ -251,14 +252,16 @@ RTC_DS3234 RTC(RTCPin);
 
  GasSensor DOsensor(adcCSPin, 2);
  GasSensor PHsensor(adcCSPin, 1);
- TemperatureSensor Tempsensor(adcCSPin, 2);
+ TemperatureSensor Tempsensor(adcCSPin, 3);
+
+ Actuator DOController(solCO2Pin)
 //////////////////////////////////////////////
 
 void setup() {
      
   // Pin setup
     // Output Pins for actuators
-    pinMode(solN2Pin, OUTPUT);
+    // pinMode(solN2Pin, OUTPUT);
     pinMode(heaterPin, OUTPUT);
     pinMode(chillerPin, OUTPUT);
     pinMode(solCO2Pin, OUTPUT);

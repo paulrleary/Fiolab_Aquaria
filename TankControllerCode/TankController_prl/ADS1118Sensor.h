@@ -7,17 +7,17 @@ class ADS1118Sensor
 {
 public:
 	int CSPin;
-  int ADCChannel;
+  	int ADCChannel;
 
-  byte MSBConf;
-  byte LSBConf;
+  	byte MSBConf;
+  	byte LSBConf;
  
 
 	ADS1118Sensor(int csPin = 0, int adcChannel = 0);
 
-  int readSensor();
+  	int readSensor();
   
-  int readADC();
+  	int readADC();
 	
 	
 };
