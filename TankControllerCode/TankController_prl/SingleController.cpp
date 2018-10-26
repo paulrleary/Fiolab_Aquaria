@@ -1,9 +1,10 @@
 #include "SingleController.h"
 
 SingleController::SingleController(int pin, int direction, float cycleperiod, float dutycycle): Pin(pin), Direction(direction), DutyCycleTimer(cycleperiod, dutycycle){
-	pinMode(Pin, OUTPUT);
 	rangeBuffer = 0;
 }
+
+SingleController::~SingleController(){}
 
 void SingleController::setPin(int pin){
 	Pin = pin;
@@ -31,6 +32,8 @@ void SingleController::updateSetRange(float min, float max){
 }
 
 void SingleController::updateControl(float currentreading){
+  pinMode(Pin, OUTPUT);
+  
 	CurrentReading = currentreading;
 	if (isTimerComplete()){
 		if(Direction < 0){
@@ -44,5 +47,5 @@ void SingleController::updateControl(float currentreading){
 			}
 		}
 	}
-	digitalWrite(Pin, getTimerState())
+	digitalWrite(Pin, getTimerState());
 }

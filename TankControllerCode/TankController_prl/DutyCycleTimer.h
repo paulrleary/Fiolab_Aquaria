@@ -13,7 +13,7 @@ class DutyCycleTimer{
 
   void setCyclePeriod(float cycleperiod = 0);
 
-  void setDutyCyclePeriod(float dutycycle = 0);
+  void setDutyCycle(float dutycycle = 0);
   
 	void startDutyCycle();
 	void startDutyCycle(float dutycycle);

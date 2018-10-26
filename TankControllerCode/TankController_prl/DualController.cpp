@@ -6,19 +6,21 @@ DualController::DualController(int negativecontrollerpin, int positivecontroller
 		NegativeController.setDutyCycle(negativecontrollerdutycycle);
 		NegativeController.setDirection(-1);
 
-		PosititiveController.setPin(positivecontrollerpin);
-		PosititiveController.setCyclePeriod(positivecontrollercycleperiod);
-		PosititiveController.setDutyCycle(positivecontrollerdutycycle);
-		PosititiveController.setDirection(1);
+		PositiveController.setPin(positivecontrollerpin);
+		PositiveController.setCyclePeriod(positivecontrollercycleperiod);
+		PositiveController.setDutyCycle(positivecontrollerdutycycle);
+		PositiveController.setDirection(1);
 	}
+
+DualController::~DualController(){}
 
 void DualController::setAllCyclePeriod(float cycleperiod){
 	NegativeController.setCyclePeriod(cycleperiod);
-	PostiveController.setCyclePeriod(cycleperiod);
+	PositiveController.setCyclePeriod(cycleperiod);
 }
 void DualController::setAllDutyCycle(float dutycycle){
 	NegativeController.setDutyCycle(dutycycle);
-	PostiveController.setDutyCycle(dutycycle);
+	PositiveController.setDutyCycle(dutycycle);
 }
 void DualController::setAllRangeBuffer(float rangebuffer){
 	NegativeController.setRangeBuffer(rangebuffer);

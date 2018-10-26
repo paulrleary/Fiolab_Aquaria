@@ -12,7 +12,7 @@ public:
 		
 		float SetRangeMin;
 		float SetRangeMax;
-		float RangeBuffer;
+		float rangeBuffer;
 
 		float CurrentReading;
 
@@ -25,8 +25,10 @@ public:
 
 		void setCyclePeriod(float cycleperiod = 0);
 
-  		void setDutyCycle(float dutycycle = 0);
-
+  	void setDutyCycle(float dutycycle = 0);
+     
+    void setRangeBuffer(float rangebuffer = 0);
+		
 		void updateSetRange(float min, float max);
 
 		void updateControl(float currentreading);
