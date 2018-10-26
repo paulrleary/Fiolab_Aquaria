@@ -1,6 +1,6 @@
 #include "Actuator.h"
 
-Actuator::Actuator(int pin):Pin(pin){
+Actuator::Actuator(int pin, float cycleperiod, float dutycycle):Pin(pin), DutyCycleTimer(cycleperiod, dutycycle){
 	pinMode(Pin, OUTPUT);
 }
 
